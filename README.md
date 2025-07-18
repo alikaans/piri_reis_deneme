@@ -1,101 +1,139 @@
-### Projenin Özeti
-**Proje Genel Bakış**: Bu proje, Degz Robotics’in **Suibo kontrol kartı** ile çalışan, **Crab 8** itici konfigürasyonunda bir insansız sualtı aracı (UUV) için kontrol sistemidir. Sistem, bir oyun kolu ile manuel kontrol, PID kontrolü ile otonom stabilizasyon ve gerçek zamanlı sensör geri bildirimi sağlar. Python tabanlı bir GUI uygulaması üzerinden yönetilir ve seri iletişim (UART, 115200 baud) ile komut gönderip IMU verileri alır. Navigasyon, inceleme veya keşif gibi görevleri destekler.
 
-#### Bileşenler
-1. **Suibo Kontrol Kartı**:
-   - **Donanım**: ARM M0 mikrodenetleyicisi, 8 motor desteği, 9 eksenli IMU (jiroskop/ivmeölçer, LSM6DS3 varsayımı, manyetometre yok), UART, 3.3–6V güç.
-   - **Yazılım**: `suibo_controller.ino` çalıştırır, GUI’den gelen komutları (`PID:`, `!GP:`, `AUTONOM:`) ayrıştırır, iticileri kontrol eder ve IMU geri bildirimi (`IMU:yaw,pitch,roll\n`) gönderir.
-2. **Crab 8 İtici Konfigürasyonu**:
-   - 8 itici (örn. Blue Robotics T100), ESC’ler aracılığıyla kontrol edilir (PWM 1270–1730 µs):
-     - Motorlar 0–3: İleri/geri (X ekseni).
-     - Motorlar 4–5: Yanal hareket (Y ekseni).
-     - Motorlar 6–7: Derinlik kontrolü (Z ekseni).
-   - 4 serbestlik derecesi (DOF): ileri/geri, yanal, derinlik, yunuslama (yaw); PID ile pitch/roll stabilizasyonu.
-3. **GUI Uygulaması**:
-   - **main.py**: GUI pencerelerini başlatır.
-   - **PID_Editor_GUI.py**: Yaw, pitch ve roll için PID parametrelerini ayarlar (`PID:yaw,kp,ki,kd;pitch,kp,ki,kd;roll,kp,ki,kd;\n`).
-   - **Controller_Input_GUI.py**: Oyun kolu girişlerini gönderir (`!GP:AXES:a1,a2,a3,a4;BUTTONS:b1,b2,...;\n`).
-   - **otonom_starter.py**: Otonom modu açar/kapatır (`AUTONOM:START\n`, `AUTONOM:STOP\n`, `AUTONOM:LOAD_ROUTE:DEFAULT\n`) ve IMU verilerini görüntüler.
-   - **serial_manager.py**: UART iletişimini yönetir (115200 baud).
-4. **IMU**:
-   - LSM6DS3 (varsayım), yunuslama (jiroskop entegrasyonu), pitch ve roll (ivmeölçer) verileri sağlar.
-5. **İletişim**:
-   - UART (USB veya kablo ile), komut gönderir ve `IMU:yaw,pitch,roll\n` alır.
+#### **Adım 1: Gereksinimleri Anlama**
+Bu sistem, Suibo kartı ile çalışan bir su altı aracı (örneğin, Suibo Derin Commander) için tasarlanmıştır. Gerekli bileşenler:
+- **Donanım**:
+  - Suibo kartı (yerleşik ivmeölçer ve jiroskop ile).
+  - 8 pervaneli (Crab 8 konfigürasyonu) su altı aracı.
+  - USB seri port kablosu.
+  - Oyun kolu (örneğin, Xbox veya PS4 kontrol cihazı).
+- **Yazılım**:
+  - Python 3.8+ (PyQt5, pygame, pyserial kütüphaneleri).
+  - Arduino IDE.
+  - Adafruit LSM6DS ve Adafruit_Sensor kütüphaneleri (Suibo’nun IMU’su için).
+- **Bağlantı**: Seri port (örneğin, COM1) üzerinden iletişim, 115200 baud rate.
 
-#### Sistemin İşleyişi
-- **Manuel Kontrol**: Oyun kolu girişleri (X/Y/Z eksenleri, düğme 0 durdurma) iticileri doğrudan kontrol eder.
-- **Otonom Mod**: IMU verileriyle PID, yunuslama, pitch ve roll’u stabilize eder; rota navigasyonu için yer tutucu.
-- **Geri Bildirim**: Suibo, IMU verilerini GUI’ye gönderir (örn. `IMU:123.45,10.20,5.30`).
-- **Komutlar**:
-  - PID: Stabilizasyon parametrelerini günceller.
-  - Oyun Kolu: Eksenleri iticilere, düğmeleri kontrol işlevlerine eşler.
-  - Otonom: PID kontrolünü başlatır/durdurur, rota yükler (yer tutucu).
-
-#### Tam İşlevsellik
-- **Manuel**: Oyun kolu ile hassas hareket ve yunuslama kontrolü.
-- **Otonom**: Türbülanslı sularda stabilizasyon.
-- **Geri Bildirim**: Gerçek zamanlı yunuslama, pitch, roll gösterimi.
-- **Esneklik**: Derin Commander ile rota navigasyonu eklenebilir.
-
-### Adım Adım Kurulum Rehberi (Tutorial)
-
-#### 1. Donanım Kurulumu
-1. **Suibo Kontrol Kartı**:
-   - Suibo’yu 3.3–6V ile besleyin (örn. batarya veya USB).
-   - USB-to-serial ile bilgisayara bağlayın (örn. COM1).
-2. **İticiler (Crab 8)**:
-   - 8 ESC’yi PWM pinlerine bağlayın (3, 5, 6, 9, 10, 11, 12, 13; Suibo’nun pin şemasını doğrulayın).
-   - Bağlantılar:
-     - Motorlar 0–3: İleri/geri.
-     - Motorlar 4–5: Yanal hareket.
-     - Motorlar 6–7: Derinlik.
-   - ESC’leri bataryayla (örn. 12V) besleyin, Suibo ile ortak toprak kullanın.
-3. **IMU**:
-   - LSM6DS3’ü I2C üzerinden bağlayın (SDA/SCL pinleri, adres 0x6A).
-4. **Kablo (Opsiyonel)**:
-   - Sualtı için UART destekli kablo kullanın.
-
-#### 2. Yazılım Kurulumu
-1. **Arduino IDE**:
-   - [arduino.cc](https://www.arduino.cc/en/software) adresinden Arduino IDE 2.x’i indirin ve kurun.
-   - ARM M0 desteği için Boards Manager’dan “Arduino SAMD Boards”u ekleyin.
-2. **Kütüphaneler**:
-   - `Servo` kütüphanesi (Arduino IDE ile gelir).
-   - `Adafruit_LSM6DS` kütüphanesini Library Manager’dan kurun.
-   - Suibo’nun Derin Commander kütüphanesini (varsa) [Degz Robotics GitHub](https://github.com/degzrobotics) üzerinden yükleyin.
-3. **Arduino Kodu Yükleme**:
-   - `suibo_controller.ino` dosyasını Arduino IDE’de açın.
-   - Kart (örn. Arduino Zero) ve portu (COM1) seçin.
-   - Kodu yükleyin, Serial Monitor’da (115200 baud) doğrulamayı kontrol edin.
-4. **GUI Bağımlılıkları**:
-   - Python 3.x kurun.
-   - Gerekli kütüphaneleri yükleyin:
+#### **Adım 2: Yazılım Kurulumları**
+1. **Python Ortamını Hazırlama**:
+   - Python 3.8 veya üstü bir sürümü yükleyin (https://www.python.org/).
+   - Gerekli kütüphaneleri yüklemek için terminalde şu komutları çalıştırın:
      ```bash
-     pip install pyserial tkinter pygame
+     pip install pyqt5 pygame pyserial
      ```
-   - Tüm GUI dosyalarını (`main.py`, `PID_Editor_GUI.py`, vb.) aynı klasöre yerleştirin.
-5. **Dive Control (Opsiyonel)**:
-   - [Degz Robotics GitHub](https://github.com/degzrobotics)’dan Dive Control’ü indirin ve kurun.
+   - Kod dosyalarını (`main.py`, `Controller_Input_GUI.py`, `PID_Editor_GUI.py`, `otonom_starter.py`, `serial_manager.py`) bir klasöre yerleştirin.
 
-#### 3. Yapılandırma ve Test
-1. **ESC Kalibrasyonu**:
-   - İticileri ayırarak ESC’leri açın.
-   - `!GP:AXES:128,128,128,128;BUTTONS:0,0,0,0,0,0,0,0;\n` komutuyla nötr PWM (1500 µs) gönderin.
-   - ESC kalibrasyon prosedürünü izleyin (örn. maks-min-nötr).
-2. **IMU Kalibrasyonu**:
-   - `Adafruit_LSM6DS` örnek kalibrasyon kodunu veya Dive Control’ü kullanın.
-3. **İletişim Testi**:
-   - `main.py`’yi çalıştırın, COM1 bağlantısını doğrulayın.
-   - Serial Monitor ile komutları test edin (örn. `PID:yaw,1.0,0.1,0.5;...`, `AUTONOM:START\n`).
-4. **Manuel Kontrol Testi**:
-   - `Controller_Input_GUI.py` ile oyun kolu hareketlerini test edin (X/Y/Z eksenleri).
-5. **Otonom Mod Testi**:
-   - `otonom_starter.py` ile otonom modu başlatın/durdurun, IMU geri bildirimini izleyin.
-6. **Rota Testi**:
-   - Derin Commander ile `AUTONOM:LOAD_ROUTE:DEFAULT`’u uygulayın (varsa).
+2. **Arduino Ortamını Hazırlama**:
+   - Arduino IDE’yi yükleyin (https://www.arduino.cc/en/software).
+   - Güncellenmiş `suibo_controller.ino` dosyasını Arduino IDE ile açın.
+   - Gerekli kütüphaneleri yükleyin:
+     - `Servo.h` ve `Wire.h` (Arduino IDE ile gelir).
+     - `Adafruit_Sensor` ve `Adafruit_LSM6DS` kütüphaneleri:
+       ```bash
+       Arduino IDE -> Sketch -> Include Library -> Manage Libraries -> "Adafruit LSM6DS" ve "Adafruit_Sensor" arat ve kur
+       ```
+   - Suibo kartını bilgisayara bağlayın ve doğru COM portunu seçin (örneğin, COM1).
 
+#### **Adım 3: Donanım Kurulumu**
+1. **Suibo Kartı ve Motor Bağlantıları**:
+   - 8 adet ESC’yi (Electronic Speed Controller) Suibo kartının PWM pinlerine bağlayın (pinler: 3, 5, 6, 9, 10, 11, 12, 13).
+   - ESC’lerin motorlara ve güç kaynağına doğru bağlandığından emin olun.
+   - Motorların nötr pozisyonda (1500 µs PWM) olduğundan emin olun.
 
-### Notlar
-- **IMU**: `updateIMU`’daki simüle verileri `Adafruit_LSM6DS` ile değiştirin.
-- **Derin Commander**: Kütüphane varsa, rota navigasyonunu entegre edin.
-- **İticiler**: ESC’lerin PWM aralığını (1270–1730 µs) doğrulayın.
+2. **IMU Bağlantısı**:
+   - Suibo kartının yerleşik ivmeölçer ve jiroskopu kullanıldığından, ek sensör bağlantısı gerekmez.
+   - Kartın I2C pinlerinin (SCL, SDA) doğru şekilde yapılandırıldığından emin olun (varsayılan olarak bağlı olmalıdır).
+
+3. **Seri Port Bağlantısı**:
+   - Suibo kartını USB kablosuyla bilgisayara bağlayın.
+   - Doğru COM portunu not edin (örneğin, COM1).
+
+#### **Adım 4: Arduino Kodunu Yükleme**
+1. Arduino IDE’de `suibo_controller.ino` dosyasını açın.
+2. Kodda şu ayarları kontrol edin:
+   - Seri port baud rate: `Serial.begin(115200)` (GUI ile eşleşmeli).
+   - Motor pinleri: `motorPins` dizisi (PWM pinlerinizi doğrulayın).
+   - IMU ayarları: `initIMU()` fonksiyonu, Suibo’nun yerleşik IMU’su için yapılandırılmıştır (416 Hz, 8g, 1000 dps).
+3. Kodu Suibo kartına yükleyin:
+   - Arduino IDE’de "Upload" butonuna tıklayın.
+   - Yükleme başarılıysa, seri monitörde (115200 baud) "IMU initialized" mesajını görmelisiniz.
+
+#### **Adım 5: Python Uygulamasını Çalıştırma**
+1. **Seri Port Ayarını Güncelleme**:
+   - `main.py` içinde `serial_manager = SerialPortManager(port='COM1', baudrate=115200)` satırındaki `port` değerini Suibo kartınızın bağlı olduğu COM portuyla değiştirin (örneğin, `COM3`).
+
+2. **Uygulamayı Başlatma**:
+   - Terminalde proje klasörüne gidin ve şu komutu çalıştırın:
+     ```bash
+     python main.py
+     ```
+   - Üç pencere açılacaktır:
+     - **PID Kontrol Arayüzü**: PID parametrelerini ayarlamak için.
+     - **Gamepad Kontrol Arayüzü**: Oyun kolu ile kontrol için.
+     - **Otonom Mod Kontrolü**: Otonom modu başlatmak/durdurmak için.
+
+#### **Adım 6: Sistemi Kullanma**
+1. **Gamepad Kontrolü**:
+   - Oyun kolunu bilgisayara bağlayın (USB veya Bluetooth).
+   - `Controller_Input_GUI` penceresinde:
+     - Bağlantı durumu "Gamepad: Bağlı" olarak güncellenir (yeşil renk).
+     - Joystick eksenleri progress bar’larda, düğmeler ise renk değişimiyle (yeşil=aktif, gri=pasif) gösterilir.
+     - "Kalibrasyon Yap" butonuna tıklayarak oyun kolu kalibrasyonunu test edebilirsiniz.
+   - Joystick hareketleri ve düğmeler, seri port üzerinden Suibo kartına gönderilir ve motorlar buna göre hareket eder.
+
+2. **PID Ayarları**:
+   - `PID_Editor_GUI` penceresinde:
+     - Yaw, pitch ve roll için Kp, Ki, Kd değerlerini girin (örneğin, Kp=1.0, Ki=0.1, Kd=0.5).
+     - "Tüm PID Değerlerini Gönder" butonuna tıklayın.
+     - Değerler seri port üzerinden Suibo kartına gönderilir ve PID kontrolü için kullanılır.
+   - Bağlantı durumu yeşil LED ile gösterilir.
+
+3. **Otonom Mod**:
+   - `otonom_starter` penceresinde:
+     - "Otonom Mod Başlat" butonuna tıklayın; bu, Suibo kartına `AUTONOM:START` komutunu gönderir ve PID kontrollü otonom stabilizasyon başlar.
+     - "Rota Yükle" butonu, önceden tanımlı bir rotayı yükler (şu an yalnızca varsayılan rota destekleniyor).
+     - Durumu durdurmak için "Otonom Modu Durdur" butonuna tıklayın; motorlar nötr konuma döner.
+
+4. **Seri Port İletişimi**:
+   - `serial_manager.py`, tüm veri alışverişini thread-safe şekilde yönetir.
+   - Suibo kartından gelen IMU verileri (örneğin, `IMU:10.50,5.25,3.15`), `otonom_starter` arayüzünde durum etiketi olarak görünür.
+
+#### **Adım 7: Test ve Hata Ayıklama**
+1. **Oyun Kolu Testi**:
+   - Oyun kolunu hareket ettirin ve `Controller_Input_GUI`’deki progress bar’ların güncellendiğini doğrulayın.
+   - Düğmelere basın; etiketlerin yeşile dönmesi gerekir.
+
+2. **PID Kontrol Testi**:
+   - Arduino seri monitörünü açarak (115200 baud) gönderilen PID komutlarını kontrol edin (örneğin, `PID:yaw,1.000,0.100,0.500;...`).
+   - IMU verilerinin seri monitörde düzenli olarak göründüğünü doğrulayın (örneğin, `IMU:10.50,5.25,3.15`).
+
+3. **Otonom Mod Testi**:
+   - Otonom modu başlatarak motorların PID kontrolüyle hareket ettiğini gözlemleyin.
+   - IMU verilerinin stabilizasyon için kullanıldığını seri monitördeki geri bildirimle doğrulayın.
+
+4. **Hata Ayıklama**:
+   - Seri port bağlantı sorunları için `serial_manager.py`’deki hata mesajlarını kontrol edin.
+   - Oyun kolu bağlantısı başarısız olursa, pygame’in doğru şekilde yüklendiğinden ve oyun kolunun bağlı olduğundan emin olun.
+   - IMU verileri gelmiyorsa, Suibo kartının yerleşik IMU’sunun doğru yapılandırıldığını ve `initIMU()` fonksiyonunun çalıştığını kontrol edin.
+
+#### **Adım 8: Özelleştirme ve Geliştirme**
+1. **IMU Kalibrasyonu**:
+   - Suibo’nun yerleşik IMU’su için kalibrasyon gerekiyorsa, `initIMU()` fonksiyonuna kalibrasyon rutinleri ekleyin (örneğin, jiroskop sıfırlama veya ivmeölçer ofset ayarı).
+
+2. **Rota Yükleme**:
+   - `otonom_starter.py`’deki `load_route()` fonksiyonunu, gerçek rota verileriyle (örneğin, bir JSON dosyası veya Derin Commander API’si) entegre edin.
+
+3. **Motor Haritalama**:
+   - `applyGamepadControl()` fonksiyonunda motor haritalamasını, aracınızın fiziksel konfigürasyonuna göre özelleştirin.
+
+4. **GUI Özelleştirme**:
+   - `Controller_Input_GUI.py`’de daha fazla eksen veya düğme eklemek için `create_axis_group()` ve `create_button_group()` fonksiyonlarını güncelleyin.
+
+#### **Adım 9: Yaygın Sorunlar ve Çözümler**
+- **Oyun Kolu Algılanmıyor**: pygame’in doğru yüklendiğini ve oyun kolunun bağlı olduğunu kontrol edin. `pygame.joystick.get_count()`’u test edin.
+- **Seri Port Hatası**: Doğru COM portunu kullandığınızdan emin olun. `serial_manager.py`’deki `reconnect()` fonksiyonu otomatik yeniden bağlanmayı dener.
+- **IMU Verileri Yanlış**: Suibo kartının IMU’sunun düzgün çalıştığını ve kütüphanelerin doğru yüklendiğini kontrol edin. `lsm6ds.begin()`’in başarılı olduğunu seri monitörde doğrulayın.
+- **Motorlar Çalışmıyor**: ESC’lerin kalibre edildiğinden ve PWM sinyallerinin doğru aralıkta (1270-1730 µs) olduğundan emin olun.
+
+#### **Adım 10: Son Notlar**
+- Güncellenmiş kod, Suibo kartının yerleşik IMU’sunu kullanarak daha entegre bir çözüm sunar.
+- Gerçek bir su altı aracıyla test etmeden önce, tüm motor ve sensör bağlantılarını kuru bir ortamda test edin.
+- Arduino seri monitörünü ve Python konsol çıktılarını aktif olarak izleyerek hata ayıklamayı kolaylaştırın.
