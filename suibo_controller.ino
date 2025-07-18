@@ -1,8 +1,10 @@
 #include <Wire.h>
 #include <Servo.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_LSM6DS.h>
 
-// Simulated IMU (replace with Suibo's LSM6DS3 or equivalent)
-#define IMU_UPDATE_INTERVAL 100 // ms
+// Suibo kartının yerleşik IMU'su için sensör nesnesi
+Adafruit_LSM6DS lsm6ds;
 
 // Motor pins for Crab 8 configuration (8 thrusters)
 #define NUM_MOTORS 8
@@ -23,7 +25,7 @@ PIDParams pidYaw = {0.0, 0.0, 0.0, 0.0, 0.0};
 PIDParams pidPitch = {0.0, 0.0, 0.0, 0.0, 0.0};
 PIDParams pidRoll = {0.0, 0.0, 0.0, 0.0, 0.0};
 
-// IMU data (from gyroscope/accelerometer, no magnetometer)
+// IMU data (from Suibo's onboard accelerometer and gyroscope)
 struct IMUData {
   float yaw, pitch, roll;
 };
@@ -33,15 +35,16 @@ IMUData imuData = {0.0, 0.0, 0.0};
 bool isAutonomous = false;
 
 // Timing for IMU updates and feedback
+#define IMU_UPDATE_INTERVAL 100 // ms
+#define FEEDBACK_INTERVAL 1000 // ms
 unsigned long lastIMUUpdate = 0;
 unsigned long lastFeedback = 0;
-#define FEEDBACK_INTERVAL 1000 // ms
 
 void setup() {
   // Initialize serial communication (match GUI's baud rate)
   Serial.begin(115200);
   
-  // Initialize I2C for IMU (e.g., LSM6DS3)
+  // Initialize I2C for IMU
   Wire.begin();
   initIMU();
   
@@ -78,40 +81,29 @@ void loop() {
 }
 
 void initIMU() {
-  // Initialize LSM6DS3 or equivalent IMU (simplified, replace with actual library)
-  Wire.beginTransmission(0x6A); // LSM6DS3 default I2C address
-  Wire.write(0x10); // CTRL1_XL (accelerometer)
-  Wire.write(0x60); // 416 Hz, 8g range
-  Wire.endTransmission();
-  Wire.beginTransmission(0x6A);
-  Wire.write(0x11); // CTRL2_G (gyroscope)
-  Wire.write(0x60); // 416 Hz, 1000 dps
-  Wire.endTransmission();
+  // Initialize Suibo's onboard IMU (assumed to be compatible with Adafruit LSM6DS)
+  if (!lsm6ds.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while (1); // Halt if IMU initialization fails
+  }
+  // Configure accelerometer and gyroscope
+  lsm6ds.setAccelRange(LSM6DS_ACCEL_RANGE_8_G);
+  lsm6ds.setGyroRange(LSM6DS_GYRO_RANGE_1000_DPS);
+  lsm6ds.setAccelDataRate(LSM6DS_RATE_416_HZ);
+  lsm6ds.setGyroDataRate(LSM6DS_RATE_416_HZ);
+  Serial.println("IMU initialized");
 }
 
 void updateIMU() {
-  // Simulate IMU data (replace with actual LSM6DS3 library read)
-  imuData.yaw += 0.1;   // Simulated yaw increment from gyro
-  imuData.pitch += 0.05; // Simulated pitch increment
-  imuData.roll += 0.03;  // Simulated roll increment
-  // Example real LSM6DS3 read (uncomment with library):
-  /*
-  Wire.beginTransmission(0x6A);
-  Wire.write(0x22); // OUTX_L_G (gyro) and OUTX_L_XL (accel)
-  Wire.endTransmission(false);
-  Wire.requestFrom(0x6A, 12);
-  if (Wire.available() >= 12) {
-    int16_t gx = Wire.read() | (Wire.read() << 8);
-    int16_t gy = Wire.read() | (Wire.read() << 8);
-    int16_t gz = Wire.read() | (Wire.read() << 8);
-    int16_t ax = Wire.read() | (Wire.read() << 8);
-    int16_t ay = Wire.read() | (Wire.read() << 8);
-    int16_t az = Wire.read() | (Wire.read() << 8);
-    imuData.yaw += gx * 0.035; // Example: 1000 dps scale, 100 ms interval
-    imuData.pitch = atan2(-ax, sqrt(ay*ay + az*az)) * 180.0 / PI;
-    imuData.roll = atan2(ay, az) * 180.0 / PI;
-  }
-  */
+  // Read accelerometer and gyroscope data from Suibo's onboard IMU
+  sensors_event_t accel, gyro, temp;
+  lsm6ds.getEvent(&accel, &gyro, &temp);
+  
+  // Update yaw (integrate gyro z-axis)
+  imuData.yaw += gyro.gyro.z * (IMU_UPDATE_INTERVAL / 1000.0); // Degrees per second * time
+  // Calculate pitch and roll from accelerometer
+  imuData.pitch = atan2(-accel.acceleration.x, sqrt(accel.acceleration.y * accel.acceleration.y + accel.acceleration.z * accel.acceleration.z)) * 180.0 / PI;
+  imuData.roll = atan2(accel.acceleration.y, accel.acceleration.z) * 180.0 / PI;
 }
 
 void readSerialData() {
@@ -219,7 +211,7 @@ void applyPIDControl() {
   float pitchError = targetPitch - imuData.pitch;
   float rollError = targetRoll - imuData.roll;
   
-  // Update integrals
+  // Update_integral
   pidYaw.integral += yawError;
   pidPitch.integral += pitchError;
   pidRoll.integral += rollError;
