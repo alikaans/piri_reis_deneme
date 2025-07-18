@@ -94,22 +94,8 @@
 6. **Rota Testi**:
    - Derin Commander ile `AUTONOM:LOAD_ROUTE:DEFAULT`’u uygulayın (varsa).
 
-#### 4. Sualtı Dağıtımı
-1. **Aracı Monte Edin**:
-   - 8 iticiyi Crab 8 düzeninde sabitleyin, su geçirmez kutu kullanın.
-2. **Havuzda Test**:
-   - Manuel/otonom modları ve PID stabilizasyonunu test edin.
-3. **Açık Suda Kullanım**:
-   - Kablo ile iletişim kurun, hedef derinlikte test edin.
-
-#### 5. Bakım
-- **Bağlantılar**: Su geçirmezliği kontrol edin.
-- **Yunuslama Sapması**: IMU’yu periyodik olarak sıfırlayın.
-- **Hata Günlüğü**: Serial Monitor ile hata ayıklayın.
-- **Yazılım Güncellemesi**: Degz Robotics’ten güncellemeleri kontrol edin.
 
 ### Notlar
 - **IMU**: `updateIMU`’daki simüle verileri `Adafruit_LSM6DS` ile değiştirin.
 - **Derin Commander**: Kütüphane varsa, rota navigasyonunu entegre edin.
 - **İticiler**: ESC’lerin PWM aralığını (1270–1730 µs) doğrulayın.
-- **Güvenlik**: İlk testlerde pervaneleri ayırın.
